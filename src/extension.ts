@@ -22,11 +22,10 @@ export function activate(context: vscode.ExtensionContext) {
         try {
           await uploadData(await getAllFilesContent());
           vscode.window.showInformationMessage("Sync successful!");
-        } catch (error) {
-          console.log(error);
-          vscode.window.showErrorMessage(
-            "Sync failed. Please check your connection.",
-          );
+        } catch (error: any) {
+          console.error(error);
+          const errMsg = error?.message || String(error);
+          vscode.window.showErrorMessage(`Sync failed: ${errMsg}`);
         }
       } else {
         vscode.window.showErrorMessage("No active file to sync!");
@@ -46,8 +45,6 @@ export function activate(context: vscode.ExtensionContext) {
   }
 
   context.subscriptions.push(statusBarItem, disposable);
-
-  context.subscriptions.push(disposable);
 }
 
 export function deactivate() {}

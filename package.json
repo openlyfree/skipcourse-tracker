@@ -3,6 +3,7 @@
   "displayName": "skipcourse-tracker",
   "description": "",
   "version": "0.0.1",
+  "icon": "icon.png",
   "engines": {
     "vscode": "^1.125.0"
   },

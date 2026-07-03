@@ -23,12 +23,15 @@ export function getBrowserPath(): string {
     paths.push(
       "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
       "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
-      path.join(process.env.LOCALAPPDATA || "", "Google\\Chrome\\Application\\chrome.exe")
+      path.join(
+        process.env.LOCALAPPDATA || "",
+        "Google\\Chrome\\Application\\chrome.exe",
+      ),
     );
   } else if (platform === "darwin") {
     paths.push(
       "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-      "/Applications/Chromium.app/Contents/MacOS/Chromium"
+      "/Applications/Chromium.app/Contents/MacOS/Chromium",
     );
   } else {
     paths.push(
@@ -36,7 +39,7 @@ export function getBrowserPath(): string {
       "/usr/bin/google-chrome-stable",
       "/usr/bin/chromium",
       "/usr/bin/chromium-browser",
-      "/snap/bin/chromium"
+      "/snap/bin/chromium",
     );
   }
 
@@ -45,7 +48,9 @@ export function getBrowserPath(): string {
       return p;
     }
   }
-  throw new Error("Could not find a local installation of Google Chrome or Chromium. Please install Google Chrome or Chromium to sync.");
+  throw new Error(
+    "Could not find a local installation of Google Chrome or Chromium. Please install Google Chrome or Chromium to sync.",
+  );
 }
 
 export async function uploadData(code: string) {
@@ -94,4 +99,3 @@ export async function login() {
   );
   page.getByText("Login").click();
 }
-

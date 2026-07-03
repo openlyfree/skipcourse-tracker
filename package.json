@@ -9,13 +9,15 @@
   "categories": [
     "Other"
   ],
-  "activationEvents": [],
+  "activationEvents": [
+    "*"
+  ],
   "main": "./out/extension.js",
   "contributes": {
     "commands": [
       {
-        "command": "skipcourse-tracker.helloWorld",
-        "title": "Hello World"
+        "command": "skipcourse-tracker.manualUpload",
+        "title": "SkipCourse Upload"
       }
     ]
   },
@@ -25,7 +27,8 @@
     "watch": "tsc -watch -p ./",
     "pretest": "npm run compile && npm run lint",
     "lint": "eslint src",
-    "test": "vscode-test"
+    "test": "vscode-test",
+    "format": "prettier --write *"
   },
   "devDependencies": {
     "@types/mocha": "^10.0.10",
@@ -34,6 +37,7 @@
     "@vscode/test-cli": "^0.0.15",
     "@vscode/test-electron": "^3.0.0",
     "eslint": "^10.5.0",
+    "prettier": "^3.9.4",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.61.1"
   },

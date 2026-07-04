@@ -6,11 +6,11 @@
 
 ## Features
 
-- ** Direct Workspace Syncing**: Upload your current project's code files directly to SkipCourse with a single click or command.
-- ** Status Bar Integration**: Access sync functionality instantly via the status bar item labeled `Sync to SkipCourse`.
-- ** Automated First-time Login**: Prompts for login and opens a Playwright browser window to log in to SkipCourse, storing your session profile locally.
-- ** Smart Workspace Exclusion**: Automatically ignores large dependencies and lockfiles (such as `node_modules`, `go.mod`, `.git`, `.lock` files) to ensure fast and lightweight uploads.
-- ** Automatic Metadata Detection**: Infers the upload project name dynamically from your VS Code workspace name.
+- **Direct Workspace Syncing**: Upload your current project's code files directly to SkipCourse with a single click or command.
+- **Status Bar Integration**: Access sync functionality instantly via the status bar item labeled `Sync to SkipCourse`.
+- **Automated First-time Login**: Prompts for login and opens a Playwright browser window to log in to SkipCourse, storing your session profile locally.
+- **Smart Workspace Exclusion**: Automatically ignores large dependencies and lockfiles (such as `node_modules`, `go.mod`, `.git`, `.lock` files) to ensure fast and lightweight uploads.
+- **Automatic Metadata Detection**: Infers the upload project name dynamically from your VS Code workspace name.
 
 ---
 

@@ -1,8 +1,13 @@
 {
   "name": "skipcourse-tracker",
   "displayName": "skipcourse-tracker",
-  "description": "",
+  "description": "Streamline syncing your local coding projects directly to SkipCourse.",
+  "publisher": "openlyfree",
   "version": "0.0.1",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/openlyfree/skipcourse-tracker.git"
+  },
   "icon": "icon.png",
   "engines": {
     "vscode": "^1.125.0"

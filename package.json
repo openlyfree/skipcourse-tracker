@@ -24,9 +24,35 @@
       {
         "command": "skipcourse-tracker.manualUpload",
         "title": "SkipCourse Upload"
+      },
+      {
+        "command": "skipcourse-tracker.resetProfile",
+        "title": "Reset SkipCourse Profile"
       }
-    ]
+    ],
+    "configuration": {
+      "type": "object",
+      "title": "SkipCourse Tracker",
+      "properties": {
+        "skipcourse-tracker.browserPath": {
+          "type": "string",
+          "default": "",
+          "description": "Optional path to a browser executable (Chrome/Chromium/Edge/Brave). Leave empty to use Playwright bundled browser."
+        },
+        "skipcourse-tracker.profilePath": {
+          "type": "string",
+          "default": "",
+          "description": "Optional absolute path for storing the persistent Playwright profile. Leave empty to use the default (HOME/.skipcourse-tracker-profile)."
+        },
+        "skipcourse-tracker.headed": {
+          "type": "boolean",
+          "default": false,
+          "description": "Launch browser in headed mode for troubleshooting (overrides headless mode during uploads if true)."
+        }
+      }
+    }
   },
+
   "scripts": {
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",

@@ -48,9 +48,10 @@
 
 ## Commands
 
-This extension contributes the following command:
+This extension contributes the following commands:
 
 - `skipcourse-tracker.manualUpload` (Title: **SkipCourse Upload**): Synchronizes the active workspace files with SkipCourse. Can be run from the Command Palette (`Ctrl+Shift+P` or `Cmd+Shift+P`).
+- `skipcourse-tracker.resetProfile` (Title: **Reset SkipCourse Profile**): Deletes the locally stored Playwright profile (`~/.skipcourse-tracker-profile` by default or the configured profilePath) and prompts you to re-authenticate.
 
 ---
 
@@ -66,7 +67,13 @@ This extension contributes the following command:
 
 ## Extension Settings
 
-_This extension does not currently contribute any custom user settings._ It stores your session state in your user home directory under `~/.skipcourse-tracker-profile`.
+The extension now exposes a few optional settings (Preferences → Settings → Extensions → SkipCourse Tracker):
+
+- `skipcourse-tracker.browserPath` (string): Optional path to a local browser executable (Chrome/Chromium/Edge/Brave). If empty, Playwright's bundled browser is used when available.
+- `skipcourse-tracker.profilePath` (string): Optional absolute path for storing the persistent Playwright profile. Defaults to `~/.skipcourse-tracker-profile`.
+- `skipcourse-tracker.headed` (boolean): When true, launches the browser in headed mode (useful for debugging or interactive login). Defaults to `false`.
+
+These settings are optional — sensible defaults are used when unset.
 
 ---
 

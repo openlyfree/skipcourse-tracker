@@ -3,7 +3,7 @@
   "displayName": "skipcourse-tracker",
   "description": "Streamline syncing your local coding projects directly to SkipCourse.",
   "publisher": "openlyfree",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "repository": {
     "type": "git",
     "url": "https://github.com/openlyfree/skipcourse-tracker.git"

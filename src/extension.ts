@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
-import { login, uploadData, getProfilePath, resetProfile } from "./uploader";
+import { login, uploadZip, getProfilePath, resetProfile } from "./uploader";
+import { createWorkspaceZip } from "./tracker";
 import * as fs from "fs";
-import { getAllFilesContent } from "./tracker";
 
 const outputChannel = vscode.window.createOutputChannel("SkipCourse Tracker");
 
@@ -33,45 +33,56 @@ export function activate(context: vscode.ExtensionContext) {
     "skipcourse-tracker.manualUpload",
     async () => {
       outputChannel.show();
-      const editor = vscode.window.activeTextEditor;
-      
-      if (!editor) {
-        log("error", "No active editor found - cannot proceed with sync");
-        vscode.window.showErrorMessage("No active file to sync!");
+
+      if (!vscode.workspace.workspaceFolders?.length) {
+        log("error", "No workspace folder open");
+        vscode.window.showErrorMessage("Open a folder/workspace before syncing to SkipCourse.");
         return;
       }
 
-      log("info", `Starting sync from workspace: ${vscode.workspace.name || "unknown"}`);
+      log("info", `Starting ZIP sync from workspace: ${vscode.workspace.name || "unknown"}`);
       const startTime = Date.now();
+      let zipPath: string | undefined;
 
       try {
-        vscode.window.showInformationMessage("Syncing code to SkipCourse...");
-        log("info", "Aggregating workspace files...");
+        vscode.window.showInformationMessage("Packaging workspace ZIP for SkipCourse...");
+        log("info", "Building workspace ZIP...");
 
-        let files_content = await getAllFilesContent();
-        const fileSize = Buffer.byteLength(files_content || "", "utf8");
-        log("info", `Files aggregated successfully. Total size: ${(fileSize / 1024).toFixed(2)}KB`);
+        const zipResult = await createWorkspaceZip();
+        zipPath = zipResult.zipPath;
+        log(
+          "info",
+          `ZIP ready: ${zipResult.fileCount} files, ${(zipResult.sizeBytes / 1024).toFixed(1)}KB (${zipResult.skippedCount} skipped)`,
+        );
 
-        if (!files_content || files_content.trim().length === 0) {
-          log("warn", "No files found in workspace");
-          vscode.window.showWarningMessage("No code files found to sync.");
-          return;
-        }
+        vscode.window.showInformationMessage("Uploading ZIP to SkipCourse...");
+        log("info", "Uploading ZIP via Playwright...");
 
-        log("info", "Uploading data to SkipCourse...");
-        await uploadData(files_content);
+        await uploadZip(zipPath, {
+          projectName: zipResult.projectName,
+          description: `Workspace upload from VS Code: ${zipResult.projectName}`,
+        });
 
         const duration = Date.now() - startTime;
-        log("info", `Sync successful! Duration: ${duration}ms`);
-        vscode.window.showInformationMessage("✓ Sync successful!");
-      } catch (error: any) {
+        log("info", `ZIP sync successful! Duration: ${duration}ms`);
+        vscode.window.showInformationMessage("✓ ZIP sync successful!");
+      } catch (error: unknown) {
         const duration = Date.now() - startTime;
-        const errMsg = error?.message || String(error);
+        const errMsg = error instanceof Error ? error.message : String(error);
         log("error", `Sync failed after ${duration}ms: ${errMsg}`);
-        if (error?.stack) {
+        if (error instanceof Error && error.stack) {
           log("error", `Stack trace: ${error.stack}`);
         }
         vscode.window.showErrorMessage(`Sync failed: ${errMsg}`);
+      } finally {
+        if (zipPath) {
+          try {
+            fs.unlinkSync(zipPath);
+            log("info", `Cleaned up temp ZIP: ${zipPath}`);
+          } catch {
+            // ignore cleanup errors
+          }
+        }
       }
     },
   );
@@ -91,7 +102,11 @@ export function activate(context: vscode.ExtensionContext) {
   let resetDisposable = vscode.commands.registerCommand("skipcourse-tracker.resetProfile", async () => {
     outputChannel.show();
     log("info", "Reset profile command invoked");
-    const confirmed = await vscode.window.showWarningMessage("Reset SkipCourse profile and require re-login?", { modal: true }, "Reset");
+    const confirmed = await vscode.window.showWarningMessage(
+      "Reset SkipCourse profile and require re-login?",
+      { modal: true },
+      "Reset",
+    );
     if (confirmed !== "Reset") {
       log("info", "User cancelled profile reset");
       return;
@@ -102,9 +117,10 @@ export function activate(context: vscode.ExtensionContext) {
       vscode.window.showInformationMessage("SkipCourse profile reset. Please log in again.");
       log("info", "Profile reset completed, launching login flow");
       login();
-    } catch (e: any) {
-      log("error", `Reset profile failed: ${e?.message || String(e)}`);
-      vscode.window.showErrorMessage(`Failed to reset profile: ${e?.message || String(e)}`);
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : String(e);
+      log("error", `Reset profile failed: ${message}`);
+      vscode.window.showErrorMessage(`Failed to reset profile: ${message}`);
     }
   });
 

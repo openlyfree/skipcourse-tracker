@@ -1,9 +1,9 @@
 {
   "name": "skipcourse-tracker",
   "displayName": "skipcourse-tracker",
-  "description": "Streamline syncing your local coding projects directly to SkipCourse.",
+  "description": "Sync local coding projects to SkipCourse as ZIP archives via Playwright.",
   "publisher": "openlyfree",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "repository": {
     "type": "git",
     "url": "https://github.com/openlyfree/skipcourse-tracker.git"
@@ -52,7 +52,6 @@
       }
     }
   },
-
   "scripts": {
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
@@ -63,6 +62,7 @@
     "format": "prettier --write *"
   },
   "devDependencies": {
+    "@types/jszip": "^3.4.0",
     "@types/mocha": "^10.0.10",
     "@types/node": "24.x",
     "@types/vscode": "^1.125.0",
@@ -78,6 +78,7 @@
     "serialize-javascript": "^7.0.6"
   },
   "dependencies": {
+    "jszip": "^3.10.1",
     "playwright": "^1.61.1"
   }
 }

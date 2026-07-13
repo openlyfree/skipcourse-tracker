@@ -34,8 +34,9 @@ export function getBrowserPath(): string | undefined {
         return configured;
       }
       log("warn", `Configured browserPath does not exist: ${configured}`);
-    } catch (e: any) {
-      log("warn", `Could not access configured browserPath ${configured}: ${e?.message || String(e)}`);
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : String(e);
+      log("warn", `Could not access configured browserPath ${configured}: ${message}`);
     }
   }
 
@@ -48,10 +49,8 @@ export function getBrowserPath(): string | undefined {
       "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
       "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
       path.join(process.env.LOCALAPPDATA || "", "Google\\Chrome\\Application\\chrome.exe"),
-      // Edge
       "C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe",
       "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe",
-      // Brave
       "C:\\Program Files\\BraveSoftware\\Brave-Browser\\Application\\brave.exe",
     );
   } else if (platform === "darwin") {
@@ -78,14 +77,14 @@ export function getBrowserPath(): string | undefined {
         log("info", `Found browser at: ${p}`);
         return p;
       }
-    } catch (e: any) {
-      // ignore permission errors, continue searching
-      log("warn", `Could not access path ${p}: ${e?.message || String(e)}`);
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : String(e);
+      log("warn", `Could not access path ${p}: ${message}`);
     }
   }
 
   log("warn", `No browser runtime found in standard paths. Will fall back to Playwright bundled browser.`);
-  return undefined; // allow Playwright to use its bundled browser
+  return undefined;
 }
 
 export function getProfilePath(): string {
@@ -109,80 +108,169 @@ export async function resetProfile(): Promise<void> {
     } else {
       log("info", `Profile path does not exist: ${profilePath}`);
     }
-  } catch (e: any) {
-    log("error", `Failed to remove profile path ${profilePath}: ${e?.message || String(e)}`);
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : String(e);
+    log("error", `Failed to remove profile path ${profilePath}: ${message}`);
     throw e;
   }
 }
 
-export async function uploadData(code: string) {
+async function ensureBrowser(): Promise<Page> {
+  if (!browser) {
+    log("info", "No active browser context, initializing...");
+    const executablePath = getBrowserPath();
+    const profilePath = getProfilePath();
+    log("info", `Using profile path: ${profilePath}`);
+
+    const config = vscode.workspace.getConfiguration("skipcourse-tracker");
+    const headed = !!config.get<boolean>("headed");
+
+    const launchOptions: {
+      headless: boolean;
+      executablePath?: string;
+    } = { headless: !headed };
+    if (executablePath) {
+      launchOptions.executablePath = executablePath;
+    }
+
+    browser = await chromium.launchPersistentContext(profilePath, launchOptions);
+    log("info", "Browser context created");
+
+    page = await browser.newPage();
+    log("info", "New page created");
+  }
+
+  if (!page) {
+    throw new Error("Failed to create page instance");
+  }
+  return page;
+}
+
+/**
+ * Upload a workspace ZIP via Playwright against the SkipCourse project upload page.
+ * Selects the zip through the file input (agentic pre-processor path), then submits.
+ */
+export async function uploadZip(
+  zipPath: string,
+  options?: { projectName?: string; description?: string },
+): Promise<void> {
   try {
-    if (!browser) {
-      log("info", "No active browser context, initializing...");
-      const executablePath = getBrowserPath();
-      const profilePath = getProfilePath();
-      log("info", `Using profile path: ${profilePath}`);
-
-      const config = vscode.workspace.getConfiguration("skipcourse-tracker");
-      const headed = !!config.get<boolean>("headed");
-
-      const launchOptions: any = { headless: !headed };
-      if (executablePath) launchOptions.executablePath = executablePath;
-
-      browser = await chromium.launchPersistentContext(profilePath, launchOptions);
-      log("info", "Browser context created");
-
-      page = await browser.newPage();
-      log("info", "New page created");
+    if (!fs.existsSync(zipPath)) {
+      throw new Error(`ZIP file not found: ${zipPath}`);
     }
 
-    if (!page) {
-      throw new Error("Failed to create page instance");
-    }
+    const zipSize = fs.statSync(zipPath).size;
+    log("info", `Preparing ZIP upload (${(zipSize / 1024).toFixed(1)}KB): ${zipPath}`);
+
+    const activePage = await ensureBrowser();
 
     log("info", "Navigating to SkipCourse upload page...");
-    await page.goto("https://skipcourse.com/upload?type=project", {
+    await activePage.goto("https://skipcourse.com/upload?type=project", {
       waitUntil: "domcontentloaded",
       timeout: 30000,
     });
     log("info", "Page loaded successfully");
 
-    const projectName = getProjectName() || "Coding Project";
+    // Ensure Upload & Analyze mode (not Diarize Audio)
+    const uploadTab = activePage.locator('button:has-text("Upload & Analyze")');
+    if (await uploadTab.count()) {
+      await uploadTab.first().click({ timeout: 5000 }).catch(() => undefined);
+    }
+
+    const projectName = options?.projectName || getProjectName() || "Coding Project";
     log("info", `Filling project name: ${projectName}`);
 
-    const titleField = page.locator("#title");
-    await titleField.waitFor({ state: "visible", timeout: 10000 });
+    const titleField = activePage.locator("#title");
+    await titleField.waitFor({ state: "visible", timeout: 15000 });
     await titleField.fill(projectName);
     log("info", "Project name field filled");
 
-    const codeSize = Buffer.byteLength(code || "", "utf8");
-    log("info", `Filling code field (${(codeSize / 1024).toFixed(2)}KB)...`);
+    if (options?.description) {
+      const descField = activePage.locator('.ProseMirror[role="textbox"]');
+      if (await descField.count()) {
+        await descField.first().click();
+        await descField.first().fill(options.description);
+        log("info", "Description field filled");
+      }
+    }
 
-    const descField = page.locator('.ProseMirror[role="textbox"]');
-    await descField.waitFor({ state: "visible", timeout: 10000 });
-    await descField.click();
-    await descField.fill(code);
-    log("info", "Code field filled");
+    // react-dropzone exposes a hidden file input; setInputFiles triggers onDrop with the ZIP
+    const fileInput = activePage.locator('input[type="file"]').first();
+    await fileInput.waitFor({ state: "attached", timeout: 10000 });
+    log("info", "Setting ZIP on file input...");
+    await fileInput.setInputFiles(zipPath);
+    log("info", "ZIP attached via file input");
+
+    // Wait until the selected ZIP appears in the Files list
+    const zipName = path.basename(zipPath);
+    await activePage
+      .locator(`text=${zipName}`)
+      .first()
+      .waitFor({ state: "visible", timeout: 20000 })
+      .catch(async () => {
+        // Fallback: notice toast for ZIP added
+        await activePage
+          .locator("text=/ZIP added|\\.zip/i")
+          .first()
+          .waitFor({ state: "visible", timeout: 10000 })
+          .catch(() => {
+            log("warn", "Could not confirm ZIP in UI list; continuing to submit");
+          });
+      });
 
     log("info", "Waiting for and clicking submit button...");
-    const submitButton = page.locator('button:has-text("Submit Project")');
+    const submitButton = activePage.locator('button:has-text("Submit Project")');
     await submitButton.waitFor({ state: "attached", timeout: 10000 });
+
+    // Submit may stay disabled until ZIP lands in selectedFiles — wait until enabled
+    await activePage
+      .waitForFunction(
+        () => {
+          const buttons = Array.from(document.querySelectorAll("button"));
+          const submit = buttons.find((b) => /Submit Project/i.test(b.textContent || ""));
+          return !!submit && !submit.hasAttribute("disabled") && !(submit as HTMLButtonElement).disabled;
+        },
+        undefined,
+        { timeout: 20000 },
+      )
+      .catch(() => {
+        log("warn", "Submit button may still be disabled; attempting click anyway");
+      });
+
     await submitButton.click();
     log("info", "Submit button clicked");
 
-    // Wait for navigation/confirmation
-    await page.waitForURL(/.*upload.*|.*projects.*/, { timeout: 15000 }).catch(() => {
-      log("warn", "Timeout waiting for post-upload navigation, but submission may have succeeded");
+    // Wait for celebration / processing / navigation after ZIP submit
+    await Promise.race([
+      activePage.waitForURL(/assessment\/processing|projects|match/i, { timeout: 120000 }),
+      activePage.locator("text=/Submission Complete|Code project submitted|Assessment submitted/i").first().waitFor({
+        state: "visible",
+        timeout: 120000,
+      }),
+      activePage.locator("text=/Extracting and analyzing code|Uploading code archive/i").first().waitFor({
+        state: "visible",
+        timeout: 60000,
+      }),
+    ]).catch(() => {
+      log("warn", "Timeout waiting for post-upload confirmation; submission may still have succeeded");
     });
 
-    log("info", "Upload process completed");
-  } catch (error: any) {
-    log("error", `Upload failed: ${error?.message || String(error)}`);
-    if (error?.stack) {
+    log("info", "ZIP upload process completed");
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    log("error", `Upload failed: ${message}`);
+    if (error instanceof Error && error.stack) {
       log("error", `Stack: ${error.stack}`);
     }
     throw error;
   }
+}
+
+/** @deprecated Use uploadZip — kept temporarily for callers still expecting paste upload. */
+export async function uploadData(code: string) {
+  log("warn", "uploadData(paste) is deprecated; use uploadZip instead");
+  void code;
+  throw new Error("Text paste upload has been replaced by ZIP upload. Use uploadZip().");
 }
 
 export async function login() {
@@ -190,9 +278,8 @@ export async function login() {
     log("info", "Starting login flow...");
     const executablePath = getBrowserPath();
     const profilePath = getProfilePath();
-    
+
     log("info", `Launching browser for login (profile: ${profilePath})...`);
-    const config = vscode.workspace.getConfiguration("skipcourse-tracker");
     const headed = true; // login should be headed to allow interactive auth
 
     browser = await chromium.launchPersistentContext(profilePath, {
@@ -207,8 +294,9 @@ export async function login() {
     log("info", "SkipCourse page loaded");
 
     log("info", "Waiting for user login...");
-  } catch (error: any) {
-    log("error", `Login initialization failed: ${error?.message || String(error)}`);
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    log("error", `Login initialization failed: ${message}`);
     throw error;
   }
 }
